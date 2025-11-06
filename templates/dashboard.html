@@ -19,7 +19,7 @@
   <h3>Records</h3>
   <table border="1" cellpadding="5">
     <tr>
-      <th>ID</th>
+      <th>No</th>
       <th>Name</th>
       <th>Employee ID</th>
       <th>Machine</th>
@@ -29,19 +29,26 @@
       <th>Action</th>
       {% endif %}
     </tr>
-    {% for row in records %}
+    {% for i, name, emp_id, machine, dept, dt in records %}
     <tr>
-      <td>{{ row[0] }}</td>
-      <td>{{ row[1] }}</td>
-      <td>{{ row[2] }}</td>
-      <td>{{ row[3] }}</td>
-      <td>{{ row[4] }}</td>
-      <td>{{ row[5] }}</td>
+      <td>{{ i }}</td>
+      <td>{{ name }}</td>
+      <td>{{ emp_id }}</td>
+      <td>{{ machine }}</td>
+      <td>{{ dept }}</td>
+      <td>{{ dt }}</td>
       {% if role == 'admin' %}
-      <td><a href="/delete/{{ row[0] }}">Delete</a></td>
+      <td><a href="/delete/{{ i }}">Delete</a></td>
       {% endif %}
     </tr>
     {% endfor %}
   </table>
+
+  {% if role == 'admin' %}
+  <br>
+  <form action="/delete_all" method="GET">
+    <button type="submit" style="background-color:red; color:white;">Delete All Records</button>
+  </form>
+  {% endif %}
 </body>
 </html>
