@@ -3,7 +3,7 @@ import sqlite3
 import os
 from datetime import datetime, timedelta, timezone
 
-app = Flask(name)
+app = Flask(__name__)
 app.secret_key = 'supersecretkey'
 DATABASE = 'employees.db'
 
@@ -136,7 +136,7 @@ def delete_record(record_id):
 
     return redirect(url_for('dashboard'))
 # ---------- MAIN ----------
-if name == 'main':
+if __name__ == '__main__':
     if not os.path.exists(DATABASE):
         init_db()
     else:
