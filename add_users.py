@@ -1,29 +1,18 @@
-import sys
 import sqlite3
 
-# ensure stdout uses UTF-8 so emoji prints on Windows console
-try:
-    sys.stdout.reconfigure(encoding='utf-8')
-except Exception:
-    # reconfigure may not be available in some environments — fallback silently
-    pass
-
-# Connect to the same database as your Flask app
-conn = sqlite3.connect("database.db")
+conn = sqlite3.connect("employees.db")
 c = conn.cursor()
 
-# Create the table if it doesn’t exist (for safety)
 c.execute('''CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
     password TEXT,
     role TEXT
 )''')
 
-# Insert user roles
 users = [
-    ("admin", "admin123", "admin"),   # full access
-    ("user", "user123", "user"),      # limited access
-    ("guest", "guest123", "public")   # view only
+    ("admin", "admin123", "admin"),
+    ("user", "user123", "user"),
+    ("guest", "guest123", "public")
 ]
 
 for u in users:
@@ -34,5 +23,4 @@ for u in users:
 
 conn.commit()
 conn.close()
-
-print("✅ User roles setup complete!")
+print("✅ Default users created successfully!")

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Public View</h3>
+<table class="table table-bordered">
+  <tr><th>ID</th><th>Name</th><th>Employee ID</th><th>Machine</th><th>Department</th><th>Date & Time</th></tr>
+  {% for r in records %}
+  <tr>
+    <td>{{ r[0] }}</td><td>{{ r[1] }}</td><td>{{ r[2] }}</td><td>{{ r[3] }}</td><td>{{ r[4] }}</td><td>{{ r[5] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,104 +1,156 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, g
 import sqlite3
+import os
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"  # change this for security
+app.secret_key = 'supersecretkey'
+DATABASE = 'employees.db'
 
-# Database setup
+
+# ---------- DATABASE SETUP ----------
+def get_db():
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+    return db
+
+
 def init_db():
-    conn = sqlite3.connect("database.db")
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS employees (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        employee_id TEXT,
-        machine TEXT,
-        datetime TEXT
-    )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        username TEXT PRIMARY KEY,
-        password TEXT,
-        role TEXT
-    )''')
-    conn.commit()
-    conn.close()
+    with app.app_context():
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS employees (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL,
+                            employee_id TEXT NOT NULL,
+                            machine TEXT NOT NULL,
+                            department TEXT,
+                            datetime TEXT NOT NULL
+                        )''')
+        db.commit()
 
-# Home Page (login)
-@app.route('/', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        conn = sqlite3.connect("database.db")
-        c = conn.cursor()
-        c.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password))
-        user = c.fetchone()
-        conn.close()
-        if user:
-            session['username'] = username
-            session['role'] = user[0]
-            return redirect(url_for('dashboard'))
-        else:
-            return render_template('login.html', error="Invalid login")
+
+# ---------- AUTO ADD MISSING COLUMN ----------
+def add_missing_columns():
+    with app.app_context():
+        db = get_db()
+        cursor = db.cursor()
+
+        # Get all current column names
+        cursor.execute("PRAGMA table_info(employees)")
+        columns = [info[1] for info in cursor.fetchall()]
+
+        # If department missing, add it
+        if 'department' not in columns:
+            cursor.execute("ALTER TABLE employees ADD COLUMN department TEXT")
+            db.commit()
+            print("✅ Added missing column: department")
+
+
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        db.close()
+
+
+# ---------- USER LOGIN ----------
+users = {
+    'admin': {'password': 'admin123', 'role': 'admin'},
+    'user': {'password': 'user123', 'role': 'user'},
+    'public': {'password': 'public123', 'role': 'public'}
+}
+
+
+@app.route('/')
+def home():
+    if 'username' in session:
+        return redirect(url_for('dashboard'))
     return render_template('login.html')
 
-# Dashboard (different view by role)
-@app.route('/dashboard', methods=['GET', 'POST'])
-def dashboard():
-    if 'username' not in session:
-        return redirect(url_for('login'))
 
-    conn = sqlite3.connect("database.db")
-    c = conn.cursor()
-    c.execute("SELECT * FROM employees")
-    records = c.fetchall()
-    conn.close()
+@app.route('/login', methods=['POST'])
+def login():
+    username = request.form['username']
+    password = request.form['password']
 
-    role = session['role']
-    if role == "admin":
-        return render_template('admin.html', records=records)
-    elif role == "user":
-        return render_template('dashboard.html', records=records)
-    else:
-        return render_template('public.html', records=records)
-
-# Add new entry (user)
-@app.route('/add', methods=['POST'])
-def add():
-    if 'username' not in session or session['role'] == 'public':
-        return redirect(url_for('login'))
-
-    name = request.form['name']
-    emp_id = request.form['employee_id']
-    machine = request.form['machine']
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    conn = sqlite3.connect("database.db")
-    c = conn.cursor()
-    c.execute("INSERT INTO employees (name, employee_id, machine, datetime) VALUES (?, ?, ?, ?)",
-              (name, emp_id, machine, now))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('dashboard'))
-
-# Admin delete/edit
-@app.route('/delete/<int:id>')
-def delete(id):
-    if session.get('role') != 'admin':
+    if username in users and users[username]['password'] == password:
+        session['username'] = username
+        session['role'] = users[username]['role']
         return redirect(url_for('dashboard'))
-    conn = sqlite3.connect("database.db")
-    c = conn.cursor()
-    c.execute("DELETE FROM employees WHERE id=?", (id,))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('dashboard'))
+    else:
+        return render_template('login.html', error='Invalid username or password')
+
 
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('login'))
+    return redirect(url_for('home'))
 
-if __name__ == "__main__":
-    init_db()
-    app.run(host='0.0.0.0', port=5000)
+
+# ---------- DASHBOARD ----------
+@app.route('/dashboard')
+def dashboard():
+    if 'username' not in session:
+        return redirect(url_for('home'))
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM employees")
+    records = cursor.fetchall()
+
+    return render_template('dashboard.html', records=records, role=session['role'])
+
+
+# ---------- ADD RECORD ----------
+@app.route('/add', methods=['POST'])
+def add_record():
+    if 'username' not in session:
+        return redirect(url_for('home'))
+
+    name = request.form['name']
+    employee_id = request.form['employee_id']
+    machine = request.form['machine']
+    department = request.form.get('department', '')  # optional
+    dt = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("INSERT INTO employees (name, employee_id, machine, department, datetime) VALUES (?, ?, ?, ?, ?)",
+                   (name, employee_id, machine, department, dt))
+    db.commit()
+
+    return redirect(url_for('dashboard'))
+
+
+# ---------- DELETE RECORD ----------
+@app.route('/delete/<int:record_id>')
+def delete_record(record_id):
+    if 'username' not in session or session['role'] != 'admin':
+        return redirect(url_for('dashboard'))
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM employees WHERE id = ?", (record_id,))
+    db.commit()
+
+    return redirect(url_for('dashboard'))
+# ---------- MAIN ----------
+if __name__ == '__main__':
+    # Initialize DB first, then check for missing columns
+    if not os.path.exists(DATABASE):
+        init_db()
+        print("✅ Database initialized successfully")
+    # Only check for missing columns if DB exists
+    with app.app_context():
+        db = get_db()
+        cursor = db.cursor()
+        # Verify table exists first
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='employees'")
+        if cursor.fetchone() is None:
+            init_db()
+            print("✅ Created employees table")
+        else:
+            add_missing_columns()
+    app.run(debug=True)
