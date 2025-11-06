@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, session, g
+from flask import Flask, render_template, request, redirect, url_for, session, g, send_file
 import sqlite3
 from datetime import datetime, timedelta, timezone
+import pandas as pd
+import io
 
 app = Flask(__name__)
 app.secret_key = "yoursecretkey"
@@ -146,6 +148,35 @@ def logout():
     session.pop('username', None)
     session.pop('role', None)
     return redirect(url_for('home'))
+
+# Add new route for Excel download
+@app.route('/download_excel')
+def download_excel():
+    if 'username' not in session or session.get('role') != 'admin':
+        return "Access Denied: Admins only"
+        
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM employees")
+    records = cursor.fetchall()
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(records, columns=['ID', 'Name', 'Employee ID', 'Machine', 'Department', 'DateTime'])
+    
+    # Create Excel file in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Employees')
+    output.seek(0)
+    
+    # Generate filename with current timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'employees_{timestamp}.xlsx'
+    )
 
 if __name__ == '__main__':
     init_db()

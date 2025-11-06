@@ -46,6 +46,8 @@
 
   {% if role == 'admin' %}
   <br>
+  <a href="{{ url_for('download_excel') }}" class="btn btn-success">Download Excel</a>
+  <br><br>
   <form action="/delete_all" method="GET">
     <button type="submit" style="background-color:red; color:white;">Delete All Records</button>
   </form>
