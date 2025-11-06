@@ -4,7 +4,7 @@
   <title>Dashboard</title>
 </head>
 <body>
-  <h3>Welcome, {{ username }}</h3>
+  <h3>Welcome, {{ username }} (Role: {{ role }})</h3>
   <a href="/logout">Logout</a>
 
   <h3>Add Record</h3>
@@ -25,7 +25,9 @@
       <th>Machine</th>
       <th>Department</th>
       <th>DateTime (MYT)</th>
+      {% if role == 'admin' %}
       <th>Action</th>
+      {% endif %}
     </tr>
     {% for row in records %}
     <tr>
@@ -35,7 +37,9 @@
       <td>{{ row[3] }}</td>
       <td>{{ row[4] }}</td>
       <td>{{ row[5] }}</td>
+      {% if role == 'admin' %}
       <td><a href="/delete/{{ row[0] }}">Delete</a></td>
+      {% endif %}
     </tr>
     {% endfor %}
   </table>
