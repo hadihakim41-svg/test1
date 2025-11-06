@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, g
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
@@ -36,12 +36,8 @@ def add_missing_columns():
     with app.app_context():
         db = get_db()
         cursor = db.cursor()
-
-        # Get all current column names
         cursor.execute("PRAGMA table_info(employees)")
         columns = [info[1] for info in cursor.fetchall()]
-
-        # If department missing, add it
         if 'department' not in columns:
             cursor.execute("ALTER TABLE employees ADD COLUMN department TEXT")
             db.commit()
@@ -112,8 +108,11 @@ def add_record():
     name = request.form['name']
     employee_id = request.form['employee_id']
     machine = request.form['machine']
-    department = request.form.get('department', '')  # optional
-    dt = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    department = request.form.get('department', '')
+
+    # Malaysia time (UTC+8)
+    malaysia_tz = timezone(timedelta(hours=8))
+    dt = datetime.now(malaysia_tz).strftime('%Y-%m-%d %H:%M:%S')
 
     db = get_db()
     cursor = db.cursor()
@@ -138,19 +137,8 @@ def delete_record(record_id):
     return redirect(url_for('dashboard'))
 # ---------- MAIN ----------
 if __name__ == '__main__':
-    # Initialize DB first, then check for missing columns
     if not os.path.exists(DATABASE):
         init_db()
-        print("✅ Database initialized successfully")
-    # Only check for missing columns if DB exists
-    with app.app_context():
-        db = get_db()
-        cursor = db.cursor()
-        # Verify table exists first
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='employees'")
-        if cursor.fetchone() is None:
-            init_db()
-            print("✅ Created employees table")
-        else:
-            add_missing_columns()
+    else:
+        add_missing_columns()
     app.run(debug=True)
